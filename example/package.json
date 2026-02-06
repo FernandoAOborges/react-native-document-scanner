@@ -10,7 +10,7 @@
     "build:ios": "react-native build-ios --mode Debug"
   },
   "dependencies": {
-    "@fernandoaoborges/react-native-document-scanner": "file:../fernandoaoborges-react-native-document-scanner-0.1.0.tgz",
+    "@fernandoaoborges/react-native-document-scanner": "workspace:*",
     "react": "19.2.0",
     "react-native": "0.83.0"
   },

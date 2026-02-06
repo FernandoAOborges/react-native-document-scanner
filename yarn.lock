@@ -1637,17 +1637,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@fernandoaoborges/react-native-document-scanner@file:../fernandoaoborges-react-native-document-scanner-0.1.0.tgz::locator=react-native-document-scanner-example%40workspace%3Aexample":
-  version: 0.1.0
-  resolution: "@fernandoaoborges/react-native-document-scanner@file:../fernandoaoborges-react-native-document-scanner-0.1.0.tgz#../fernandoaoborges-react-native-document-scanner-0.1.0.tgz::hash=af5893&locator=react-native-document-scanner-example%40workspace%3Aexample"
-  peerDependencies:
-    react: "*"
-    react-native: "*"
-  checksum: 10c0/3c0d6ece33f51a4935f46a57388da221581bff59181c40d1a9f36574eada2e8aa21d20e339ad9fe265cf6096462d20611412c354950331af25421efe424169f4
-  languageName: node
-  linkType: hard
-
-"@fernandoaoborges/react-native-document-scanner@workspace:.":
+"@fernandoaoborges/react-native-document-scanner@workspace:*, @fernandoaoborges/react-native-document-scanner@workspace:.":
   version: 0.0.0-use.local
   resolution: "@fernandoaoborges/react-native-document-scanner@workspace:."
   dependencies:
@@ -8828,7 +8818,7 @@ __metadata:
     "@babel/core": "npm:^7.25.2"
     "@babel/preset-env": "npm:^7.25.3"
     "@babel/runtime": "npm:^7.25.0"
-    "@fernandoaoborges/react-native-document-scanner": "file:../fernandoaoborges-react-native-document-scanner-0.1.0.tgz"
+    "@fernandoaoborges/react-native-document-scanner": "workspace:*"
     "@react-native-community/cli": "npm:20.0.0"
     "@react-native-community/cli-platform-android": "npm:20.0.0"
     "@react-native-community/cli-platform-ios": "npm:20.0.0"
