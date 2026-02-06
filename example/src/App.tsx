@@ -1,20 +1,21 @@
-import { Text, View, StyleSheet } from 'react-native';
-import { multiply } from 'react-native-document-scanner';
-
-const result = multiply(3, 7);
+import { Button, View } from 'react-native';
+import { scanDocument } from '@fernandoaoborges/react-native-document-scanner';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Result: {result}</Text>
+    <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
+      <Button
+        title="Scan"
+        onPress={async () => {
+          const res = await scanDocument({
+            allowGallery: true,
+            pageLimit: 3,
+            returnJpeg: true,
+            returnPdf: true,
+          });
+          console.log(res);
+        }}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

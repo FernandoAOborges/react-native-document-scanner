@@ -1,5 +1,12 @@
-import DocumentScanner from './NativeDocumentScanner';
+import NativeDocumentScanner, {
+  type DocumentScannerOptions,
+  type DocumentScannerResult,
+} from './NativeDocumentScanner';
 
-export function multiply(a: number, b: number): number {
-  return DocumentScanner.multiply(a, b);
+export type { DocumentScannerOptions, DocumentScannerResult };
+
+export function scanDocument(
+  options: DocumentScannerOptions = {}
+): Promise<DocumentScannerResult> {
+  return NativeDocumentScanner.scan(options);
 }

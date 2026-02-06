@@ -84,3 +84,15 @@ android/generated
 
 # React Native Nitro Modules
 nitrogen/
+
+# npm / yarn pack artifacts
+*.tgz
+
+# Android builds (example + library)
+android/build/
+example/android/build/
+example/android/app/build/
+
+# iOS builds (example)
+example/ios/build/
+example/ios/DerivedData/

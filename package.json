@@ -1,5 +1,5 @@
 {
-  "name": "react-native-document-scanner",
+  "name": "@fernandoaoborges/react-native-document-scanner",
   "version": "0.1.0",
   "description": "Document Scanner Android/IOS",
   "main": "./lib/module/index.js",
@@ -55,6 +55,7 @@
   },
   "homepage": "https://github.com/FernandoAOborges/react-native-document-scanner#readme",
   "publishConfig": {
+    "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {
