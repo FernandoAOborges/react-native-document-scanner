@@ -1,62 +1,87 @@
 # @fernandoaoborges/react-native-document-scanner
 
-Document Scanner for **React Native (Android)** powered by **Google ML Kit Document Scanner**.
+Native **Document Scanner** for **React Native** using official platform
+scanning flows:
 
-This library uses the official native document scanning flow provided by Google Play Services, including automatic document detection, cropping, perspective correction, and export.
+-   **Android:** Google Play Services ML Kit Document Scanner\
+-   **iOS:** Apple VisionKit (`VNDocumentCameraViewController`)
 
-> ⚠️ **Status**
->
-> - ✅ Android supported  
-> - ❌ iOS not implemented yet
+Automatic document detection, edge cropping, perspective correction,
+multi-page scanning and export to **JPEG** and **PDF** --- with **zero
+JavaScript camera UI**.
 
----
+------------------------------------------------------------------------
+
+## ✅ Status
+
+-   ✅ Android supported (ML Kit)
+-   ✅ iOS supported (VisionKit)
+
+------------------------------------------------------------------------
 
 ## 📦 Installation
 
-### 1) Install the package
-```bash
+``` bash
 yarn add @fernandoaoborges/react-native-document-scanner
 ```
 
 or
 
-```bash
+``` bash
 npm install @fernandoaoborges/react-native-document-scanner
 ```
 
----
-
-## 🤖 Android Requirements
-
-This module depends on **Google Play Services ML Kit – Document Scanner**.
-
-- **Minimum SDK:** 24+
-- Device must have **Google Play Services** installed
-
-No additional configuration is required in `AndroidManifest.xml`.
-
----
+------------------------------------------------------------------------
 
 ## 🔄 Rebuild the app
 
-After installation, rebuild the Android app:
+### iOS
 
-```bash
-cd android
-./gradlew clean
+``` bash
+cd ios
+pod install
+cd ..
+yarn ios
 ```
 
-Then run:
+> ⚠️ VisionKit works best on real devices. It may not be available on
+> Simulator.
 
-```bash
+### Android
+
+``` bash
+cd android
+./gradlew clean
+cd ..
 yarn android
 ```
 
----
+------------------------------------------------------------------------
 
-## 🚀 Usage (Android)
+## 🤖 Android Requirements
 
-```ts
+-   Minimum SDK: 24+
+-   Google Play Services installed on device
+
+No additional `AndroidManifest.xml` configuration required.
+
+------------------------------------------------------------------------
+
+## 🍎 iOS Requirements
+
+-   Minimum iOS: 13+
+-   Add this key to your `Info.plist`:
+
+``` xml
+<key>NSCameraUsageDescription</key>
+<string>We need camera access to scan documents.</string>
+```
+
+------------------------------------------------------------------------
+
+## 🚀 Usage
+
+``` ts
 import { scanDocument } from '@fernandoaoborges/react-native-document-scanner';
 
 const result = await scanDocument({
@@ -69,47 +94,41 @@ const result = await scanDocument({
 console.log(result);
 ```
 
----
+------------------------------------------------------------------------
 
 ## ⚙️ Options
 
-| Option | Type | Default | Description |
-|------|------|---------|-------------|
-| `allowGallery` | boolean | `true` | Allow importing images from gallery |
-| `pageLimit` | number | `10` | Maximum number of pages |
-| `returnJpeg` | boolean | `true` | Return scanned pages as JPEG |
-| `returnPdf` | boolean | `true` | Return scanned document as PDF |
+  Option         Type      Default   Notes
+  -------------- --------- --------- ----------------------------------
+  allowGallery   boolean   true      Android only. Ignored on iOS.
+  pageLimit      number    \-        Maximum number of pages returned
+  returnJpeg     boolean   true      Return scanned pages as JPEG
+  returnPdf      boolean   false     Return scanned document as PDF
 
----
+------------------------------------------------------------------------
 
 ## 📄 Result
 
-```ts
-{
-  images: Array<{
-    uri: string;
-    width: number;
-    height: number;
-    fileSize: number;
-  }>;
-  pdf?: {
-    uri: string;
-    pageCount: number;
-  };
-}
+``` ts
+export type DocumentScannerResult = {
+  canceled: boolean;
+  images: string[]; // file URIs or paths
+  pdf?: string;     // file URI or path
+};
 ```
 
----
+------------------------------------------------------------------------
 
 ## ❗ Important Notes
 
-- The camera and preview flow is **fully native** (Google ML Kit)
-- No JavaScript-based UI is used
-- The scanner opens as a **native Google Activity**
-- Ideal for document apps, onboarding, KYC, contracts, and forms
+-   The scanner UI is fully native
+-   No JavaScript camera implementation
+-   Android opens official Google scanner
+-   iOS opens official Apple VisionKit scanner
+-   Ideal for KYC, onboarding, contracts and forms
 
----
+------------------------------------------------------------------------
 
 ## 📜 License
 
-MIT © Fernando A. Borges
+MIT © Fernando A.O. Borges
