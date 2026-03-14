@@ -62,26 +62,42 @@ final class RNDocumentScannerVision: NSObject, VNDocumentCameraViewControllerDel
 
   func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
     controller.dismiss(animated: true) {
-
-      let pageLimit = (self.options["pageLimit"] as? NSNumber)?.intValue
-      let returnPdf = (self.options["returnPdf"] as? Bool) ?? false
+      // Read options and calculate the page limit while still on the main
+      // thread — lightweight work, no I/O.
+      let pageLimit  = (self.options["pageLimit"]  as? NSNumber)?.intValue
+      let returnPdf  = (self.options["returnPdf"]  as? Bool) ?? false
       let returnJpeg = (self.options["returnJpeg"] as? Bool) ?? true
 
       let total = scan.pageCount
       let limit = pageLimit != nil ? max(1, min(pageLimit!, total)) : total
 
-      var images: [String] = []
-      if returnJpeg {
-        for i in 0..<limit {
-          let img = scan.imageOfPage(at: i)
-          if let path = self.writeJpeg(img, index: i) {
-            images.append(path) // ✅ path puro
+      // isPresenting intentionally stays true at this point.
+      // Any call to scan() while background processing is running will be
+      // correctly rejected with E_BUSY, preserving single-scan semantics.
+
+      DispatchQueue.global(qos: .userInitiated).async {
+        // All JPEG compression, PDF rendering, and file writes happen here,
+        // off the main thread.
+        var images: [String] = []
+        if returnJpeg {
+          for i in 0..<limit {
+            let img = scan.imageOfPage(at: i)
+            if let path = self.writeJpeg(img, index: i) {
+              images.append(path)
+            }
           }
         }
-      }
 
-      let pdfPath: String? = returnPdf ? self.writePdf(scan: scan, limit: limit) : nil
-      self.finishResolve(canceled: false, images: images, pdf: pdfPath)
+        let pdfPath: String? = returnPdf ? self.writePdf(scan: scan, limit: limit) : nil
+
+        // Return to the main thread before calling the finish helpers.
+        // finishResolve calls cleanup() — resetting isPresenting and nulling
+        // the stored callbacks — then fires the promise, all from the main
+        // thread, consistent with every other code path in this class.
+        DispatchQueue.main.async {
+          self.finishResolve(canceled: false, images: images, pdf: pdfPath)
+        }
+      }
     }
   }
 

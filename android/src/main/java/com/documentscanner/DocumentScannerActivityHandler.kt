@@ -4,9 +4,14 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import com.facebook.react.bridge.*
-import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult;
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import java.io.File
 import java.io.FileOutputStream
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object DocumentScannerActivityHandler : ActivityEventListener {
 
@@ -14,6 +19,14 @@ object DocumentScannerActivityHandler : ActivityEventListener {
 
   private var pendingPromise: Promise? = null
   private var ctx: ReactApplicationContext? = null
+
+  // Stable, long-lived scope tied to the singleton.
+  // SupervisorJob ensures that a failure inside one file-copy coroutine does
+  // not cancel the scope itself, so subsequent scans are never affected.
+  // Dispatchers.IO is the default dispatcher: an elastic thread pool sized
+  // for blocking I/O (up to 64 threads or the number of CPU cores, whichever
+  // is larger).
+  private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
   fun start(
     context: ReactApplicationContext,
@@ -46,7 +59,6 @@ object DocumentScannerActivityHandler : ActivityEventListener {
     }
   }
 
-  // ✅ RN 0.80 signature (activity não-null)
   override fun onActivityResult(
     activity: Activity,
     requestCode: Int,
@@ -59,6 +71,7 @@ object DocumentScannerActivityHandler : ActivityEventListener {
     pendingPromise = null
     if (promise == null) return
 
+    // Cancellation path: no file I/O, resolve immediately on the main thread.
     if (resultCode != Activity.RESULT_OK || data == null) {
       val out = Arguments.createMap()
       out.putBoolean("canceled", true)
@@ -67,39 +80,54 @@ object DocumentScannerActivityHandler : ActivityEventListener {
       return
     }
 
-    try {
-      val result = GmsDocumentScanningResult.fromActivityResultIntent(data)
-
-      if (result == null) {
-        val out = Arguments.createMap()
-        out.putBoolean("canceled", true)
-        out.putArray("images", Arguments.createArray())
-        promise.resolve(out)
-        return
-      }
-
-      val out = Arguments.createMap()
-      out.putBoolean("canceled", false)
-
-      val images = Arguments.createArray()
-      result.pages?.forEach { page ->
-        val local = copyToCache(page.imageUri)
-        images.pushString(local.toString())
-      }
-      out.putArray("images", images)
-
-      result.pdf?.let { pdf ->
-        val localPdf = copyToCache(pdf.uri)
-        out.putString("pdf", localPdf.toString())
-      }
-
-      promise.resolve(out)
+    // Parse the ML Kit result object — lightweight Intent-extra read, no I/O.
+    val result = try {
+      GmsDocumentScanningResult.fromActivityResultIntent(data)
     } catch (e: Exception) {
       promise.reject("SCAN_RESULT_ERROR", e.message, e)
+      return
+    }
+
+    if (result == null) {
+      val out = Arguments.createMap()
+      out.putBoolean("canceled", true)
+      out.putArray("images", Arguments.createArray())
+      promise.resolve(out)
+      return
+    }
+
+    // Dispatch all file-copy work to the stable IO scope.
+    // After the blocking work finishes, withContext(Dispatchers.Main) returns
+    // to the main thread before touching the Promise — consistent with how
+    // Android expects UI-adjacent state to be resolved.
+    ioScope.launch {
+      try {
+        val out = Arguments.createMap()
+        out.putBoolean("canceled", false)
+
+        val images = Arguments.createArray()
+        result.pages?.forEach { page ->
+          val local = copyToCache(page.imageUri)
+          images.pushString(local.toString())
+        }
+        out.putArray("images", images)
+
+        result.pdf?.let { pdf ->
+          val localPdf = copyToCache(pdf.uri)
+          out.putString("pdf", localPdf.toString())
+        }
+
+        withContext(Dispatchers.Main) {
+          promise.resolve(out)
+        }
+      } catch (e: Exception) {
+        withContext(Dispatchers.Main) {
+          promise.reject("SCAN_RESULT_ERROR", e.message, e)
+        }
+      }
     }
   }
 
-  // ✅ RN 0.80 signature (intent não-null)
   override fun onNewIntent(intent: Intent) = Unit
 
   private fun copyToCache(uri: Uri): Uri {
