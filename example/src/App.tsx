@@ -6,9 +6,9 @@ export default function App() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [log, setLog] = useState('No scan yet');
 
-  const handleScan = async () => {
+  const handleScanDefault = async () => {
     try {
-      setLog('Opening scanner...');
+      setLog('Opening scanner (default)...');
       setImageUri(null);
 
       const res = await scanDocument();
@@ -22,7 +22,30 @@ export default function App() {
       }
     } catch (e) {
       setLog(`ERROR: ${JSON.stringify(e, null, 2)}`);
+    }
+  };
+
+  const handleScanAdvanced = async () => {
+    try {
+      setLog('Opening scanner (advanced)...');
       setImageUri(null);
+
+      const res = await scanDocument({
+        pageLimit: 3,
+        returnPdf: true,
+        returnJpeg: true,
+        allowGallery: true,
+      });
+
+      setLog(JSON.stringify(res, null, 2));
+
+      const firstImage = res.images?.[0] ?? null;
+
+      if (!res.canceled) {
+        setImageUri(firstImage);
+      }
+    } catch (e) {
+      setLog(`ERROR: ${JSON.stringify(e, null, 2)}`);
     }
   };
 
@@ -35,7 +58,9 @@ export default function App() {
         alignItems: 'center',
       }}
     >
-      <Button title="Scan document" onPress={handleScan} />
+      <Button title="Scan (default)" onPress={handleScanDefault} />
+      <View style={{ height: 12 }} />
+      <Button title="Scan (advanced)" onPress={handleScanAdvanced} />
 
       <View style={{ marginTop: 24, width: '100%' }}>
         <Text selectable>{log}</Text>

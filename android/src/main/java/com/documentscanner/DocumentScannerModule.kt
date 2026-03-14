@@ -27,8 +27,12 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
       .setGalleryImportAllowed(allowGallery)
       .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
 
-    // Only constrain page count when the caller explicitly requested a limit.
+    // Validate and apply page limit only when the caller explicitly provided one.
     if (pageLimit != null) {
+      if (pageLimit < 1) {
+        promise.reject("INVALID_PAGE_LIMIT", "pageLimit must be >= 1")
+        return
+      }
       builder.setPageLimit(pageLimit)
     }
 
