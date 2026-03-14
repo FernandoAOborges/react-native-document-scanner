@@ -1,32 +1,29 @@
 name: CI
+
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  merge_group:
-    types:
-      - checks_requested
+    tags:
+      - 'v*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # ─── Lint & Typecheck ──────────────────────────────────────────────────────
+  # Executa primeiro. Se falhar, nenhum build caro é iniciado.
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup
         uses: ./.github/actions/setup
 
-      # Generate built artifacts + d.ts so TS in example can resolve the package
-      - name: Build package (for types)
+      - name: Build package (required for type resolution)
         run: yarn prepare
 
       - name: Lint files
@@ -35,28 +32,18 @@ jobs:
       - name: Typecheck files
         run: yarn typecheck
 
-  build-library:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - name: Setup
-        uses: ./.github/actions/setup
-
-      - name: Build package
-        run: yarn prepare
-
+  # ─── Android Example Build ─────────────────────────────────────────────────
   build-android:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: lint
 
     env:
       TURBO_CACHE_DIR: .turbo/android
 
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -71,7 +58,14 @@ jobs:
 
       - name: Check turborepo cache for Android
         run: |
-          TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:android --cache-dir='${{ env.TURBO_CACHE_DIR }}' --dry=json)).tasks.find(t => t.task === 'build:android').cache.status")
+          TURBO_CACHE_STATUS=$(node -p "
+            const out = require('child_process')
+              .execSync('yarn turbo run build:android --cache-dir=\"${{ env.TURBO_CACHE_DIR }}\" --dry=json 2>/dev/null')
+              .toString();
+            const data = JSON.parse(out);
+            const task = data.tasks.find(t => t.task === 'build:android');
+            task?.cache?.status ?? 'MISS';
+          " 2>/dev/null || echo "MISS")
 
           if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
             echo "turbo_cache_hit=1" >> $GITHUB_ENV
@@ -84,10 +78,10 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Finalize Android SDK
+      - name: Accept Android SDK licenses
         if: env.turbo_cache_hit != 1
         run: |
-          /bin/bash -c "yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null"
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
 
       - name: Cache Gradle
         if: env.turbo_cache_hit != 1
@@ -110,19 +104,21 @@ jobs:
         run: |
           yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}"
 
+  # ─── iOS Example Build ─────────────────────────────────────────────────────
   build-ios:
-    if: false
-    runs-on: macos-latest
+    runs-on: macos-15
+    timeout-minutes: 90
+    needs: lint
 
     env:
-      XCODE_VERSION: 26
+      XCODE_VERSION: '16.2'
       TURBO_CACHE_DIR: .turbo/ios
       RCT_USE_RN_DEP: 1
       RCT_USE_PREBUILT_RNCORE: 1
 
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -137,10 +133,18 @@ jobs:
 
       - name: Check turborepo cache for iOS
         run: |
-          TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:ios --cache-dir='${{ env.TURBO_CACHE_DIR }}' --dry=json)).tasks.find(t => t.task === 'build:ios').cache.status")
+          TURBO_CACHE_STATUS=$(node -p "
+            const out = require('child_process')
+              .execSync('yarn turbo run build:ios --cache-dir=\"${{ env.TURBO_CACHE_DIR }}\" --dry=json 2>/dev/null')
+              .toString();
+            const data = JSON.parse(out);
+            const task = data.tasks.find(t => t.task === 'build:ios');
+            task?.cache?.status ?? 'MISS';
+          " 2>/dev/null || echo "MISS")
 
           if [[ $TURBO_CACHE_STATUS == "HIT" ]]; then
             echo "turbo_cache_hit=1" >> $GITHUB_ENV
+          fi
 
       - name: Use appropriate Xcode version
         if: env.turbo_cache_hit != 1
@@ -148,12 +152,35 @@ jobs:
         with:
           xcode-version: ${{ env.XCODE_VERSION }}
 
-      - name: Install cocoapods
-        if: env.turbo_cache_hit != 1 && steps.cocoapods-cache.outputs.cache-hit != 'true'
+      - name: Cache Ruby gems
+        if: env.turbo_cache_hit != 1
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: example/vendor/bundle
+          key: ${{ runner.os }}-gems-${{ hashFiles('example/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-gems-
+
+      - name: Install Ruby gems
+        if: env.turbo_cache_hit != 1
         run: |
           cd example
-          bundle install
-          bundle exec pod repo update --verbose
+          bundle config set --local path vendor/bundle
+          bundle install --jobs 4 --retry 3
+
+      - name: Cache CocoaPods
+        if: env.turbo_cache_hit != 1
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: example/ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('example/ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install CocoaPods
+        if: env.turbo_cache_hit != 1
+        run: |
+          cd example
           bundle exec pod install --project-directory=ios
 
       - name: Build example for iOS
