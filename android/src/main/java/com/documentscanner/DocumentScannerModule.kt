@@ -16,25 +16,29 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
       return
     }
 
-    val allowGallery = options?.getBoolean("allowGallery") ?: true
-    val pageLimit =
-      if (options != null && options.hasKey("pageLimit")) options.getInt("pageLimit") else 10
-    val returnPdf = options?.getBoolean("returnPdf") ?: true
-    val returnJpeg = options?.getBoolean("returnJpeg") ?: true
+    val allowGallery = if (options != null && options.hasKey("allowGallery")) options.getBoolean("allowGallery") else true
+    // null when omitted — ML Kit is not given a page limit, so scanning is unlimited.
+    val pageLimit: Int? =
+      if (options != null && options.hasKey("pageLimit")) options.getInt("pageLimit") else null
+    val returnJpeg = if (options != null && options.hasKey("returnJpeg")) options.getBoolean("returnJpeg") else true
+    val returnPdf  = if (options != null && options.hasKey("returnPdf"))  options.getBoolean("returnPdf")  else false
 
     val builder = GmsDocumentScannerOptions.Builder()
       .setGalleryImportAllowed(allowGallery)
-      .setPageLimit(pageLimit)
       .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
 
-    // ✅ Sem spread operator, compatível com sua API
+    // Only constrain page count when the caller explicitly requested a limit.
+    if (pageLimit != null) {
+      builder.setPageLimit(pageLimit)
+    }
+
     when {
       returnJpeg && returnPdf -> builder.setResultFormats(
         GmsDocumentScannerOptions.RESULT_FORMAT_JPEG,
         GmsDocumentScannerOptions.RESULT_FORMAT_PDF
       )
       returnPdf -> builder.setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_PDF)
-      else -> builder.setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+      else      -> builder.setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
     }
 
     val scannerOptions = builder.build()
